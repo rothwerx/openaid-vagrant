@@ -35,8 +35,8 @@ EOF
 
 function configure_php {
     # Turn off allow_url_fopen and expose_php
-    sed -i 's/\(allow_url_fopen = \)On/\1Off/g' /etc/php5/apache2/php.ini
-    sed -i 's/\(expose_php = \)On/\1Off/g' /etc/php5/apache2/php.ini
+    sed -i 's/\(allow_url_fopen = \)On/\1Off/' /etc/php5/apache2/php.ini
+    sed -i 's/\(expose_php = \)On/\1Off/' /etc/php5/apache2/php.ini
 }
 
 function configure_apache {
@@ -88,7 +88,7 @@ function tell_em {
     elif [[ $drushed ]] && [[ $drushed != 0 ]]; then
         echo "Drush configuration failed."
     else
-        echo "Log in to http://localhost:8080/user/login and complete the installation."
+        echo "Go to http://localhost:8080 and complete the installation."
     fi
 }
 
