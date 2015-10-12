@@ -3,9 +3,11 @@
 # There are a few variables you can modify below. 
 
 MYPASS='' # Set a MySQL password here, otherwise it will be 'change4prod'
-OPENAID_VERSION="7.x-2.5-core"
+OPENAID_VERSION='7.x-2.5-core'
 PACKAGES="vim git drush apache2 mariadb-server mariadb-client php5 php5-mysql php5-gd libapache2-mod-php5 php5-mcrypt"
 DRUSH_INSTALL=true # Set to false to disable drush site-install
+#GIT_BRANCH='7.x-2.x' # Uncomment and set branch to use git instead of released tarball
+
 ##################################################
 
 function preconfigure_mysql {
@@ -58,21 +60,48 @@ EOF
     service apache2 restart
 }
 
-function get_openaid {
-    # Openaid default installation & configuration. This function could be replaced with a git clone of WIP source.
-    echo "Downloading openaid-${OPENAID_VERSION}"
-    curl -sO http://ftp.drupal.org/files/projects/openaid-${OPENAID_VERSION}.tar.gz 
-    tar xzf /home/vagrant/openaid-${OPENAID_VERSION}.tar.gz
-    cd /home/vagrant/openaid-${OPENAID_VERSION//-core}/
-    rsync -az . /var/www/html
+function arrange_files {
     mkdir /var/www/html/sites/default/files
     cp /var/www/html/sites/default/default.settings.php /var/www/html/sites/default/settings.php
     chmod 664 /var/www/html/sites/default/settings.php
 }
 
+function get_openaid {
+    if [[ $GIT_BRANCH ]]; then
+        get_openaid_git
+        if [[ $? == 0 ]]; then
+            return
+        else
+            echo "Git install failed. Maybe the branch specified wasn't valid?"
+            echo "You'll need to install manually."
+            return
+        fi
+    else
+        # Openaid default installation & configuration.
+        echo "Downloading openaid-${OPENAID_VERSION}"
+        curl -sO http://ftp.drupal.org/files/projects/openaid-${OPENAID_VERSION}.tar.gz
+        tar xzf /home/vagrant/openaid-${OPENAID_VERSION}.tar.gz
+        cd /home/vagrant/openaid-${OPENAID_VERSION//-core}/
+        rsync -az . /var/www/html
+        arrange_files
+    fi
+}
+
+function get_openaid_git {
+    git clone --branch ${GIT_BRANCH} http://git.drupal.org/project/openaid.git
+    cd openaid
+    rsync -az . /var/www/html
+    cd /var/www/html/
+    drush make build-openaid.make -y
+    arrange_files
+}
+
 function configure_with_drush {
     cd /var/www/html/
-    drush site-install -y openaid --db-url=mysql://drupaluser:${MYPASS}@localhost/drupal
+    # Specifying the profile fails when it's been built from the build-openaid.make file
+    # so only set the openaid profile if it's downloaded from the tarball
+    [[ ${GIT_BRANCH} ]] || profile="openaid"
+    drush site-install -y ${profile} --db-url=mysql://drupaluser:${MYPASS}@localhost/drupal
     drushed=$?
 }
 
@@ -100,7 +129,7 @@ function main {
     create_database
     configure_php
     configure_apache
-    get_openaid # Could be replaced by a git clone function
+    get_openaid
     [[ $DRUSH_INSTALL == "true" ]] && configure_with_drush
     tell_em
     # Mark as provisioned
